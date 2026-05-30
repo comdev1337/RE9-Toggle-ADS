@@ -7,6 +7,7 @@ REFramework.NET mod to **toggle** ADS on RMB instead of **holding RMB down all t
 ## Features
 
 * Toggle ~~AIDS~~ ADS on RMB
+* Exit toggled ADS on LShift
 * It might work
 
 ## Installation

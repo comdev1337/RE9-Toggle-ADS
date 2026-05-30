@@ -10,10 +10,13 @@ public class RE9ToggleADSProbe
 {
     const int VK_RBUTTON = 0x02;
     const int VK_ESCAPE = 0x1B;
+    const int VK_SHIFT = 0x10;
+    const int VK_LSHIFT = 0xA0;
 
     static bool toggleEnabled = true;
     static bool gameHoldOverrideEnabled = true;
     static bool autoLearnHoldButton = true;
+    static bool runCancelsAds = true;
     static bool diagnosticLogging;
     static bool showDebugDetails;
 
@@ -22,6 +25,7 @@ public class RE9ToggleADSProbe
     static bool sawAdsDuringPress;
     static bool lastRButtonDown;
     static bool lastEscapeDown;
+    static bool lastRunKeyDown;
 
     static int cameraMode = -1;
     static int cameraType = -1;
@@ -31,6 +35,7 @@ public class RE9ToggleADSProbe
     static int physicalRButtonDowns;
     static int physicalRButtonUps;
     static int exitClicks;
+    static int runCancelCount;
     static string lastInputAction = "none";
 
     static Field inputButtonOriginInputField;
@@ -84,6 +89,7 @@ public class RE9ToggleADSProbe
     public static void OnUpdateBehaviorPost()
     {
         WatchEscape();
+        WatchRunKey();
         WatchRightMouseButton();
         UpdateCandidateLearning();
     }
@@ -100,6 +106,7 @@ public class RE9ToggleADSProbe
 
         ImGui.Checkbox("Game hold override", ref gameHoldOverrideEnabled);
         ImGui.Checkbox("Auto-learn hold button", ref autoLearnHoldButton);
+        ImGui.Checkbox("LShift cancels ADS", ref runCancelsAds);
 
         if (ImGui.Button("Force ADS off"))
         {
@@ -122,6 +129,7 @@ public class RE9ToggleADSProbe
         ImGui.Text($"sawAdsDuringPress: {sawAdsDuringPress}");
         ImGui.Text($"RMB down/up: {physicalRButtonDowns}/{physicalRButtonUps}");
         ImGui.Text($"exit clicks: {exitClicks}");
+        ImGui.Text($"run cancels: {runCancelCount}");
         ImGui.Text($"last input action: {lastInputAction}");
         ImGui.Text($"camera hook calls: {cameraHookCalls}");
         ImGui.Text($"button update calls: {inputButtonUpdateCalls}");
@@ -255,6 +263,21 @@ public class RE9ToggleADSProbe
         }
 
         lastEscapeDown = escapeDown;
+    }
+
+    static void WatchRunKey()
+    {
+        bool runKeyDown = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0 ||
+            (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+
+        if (runCancelsAds && runKeyDown && !lastRunKeyDown && latched)
+        {
+            runCancelCount++;
+            ReleaseLatch("run-key");
+            lastInputAction = "exit-run-key";
+        }
+
+        lastRunKeyDown = runKeyDown;
     }
 
     static void ReleaseLatch(string reason)
