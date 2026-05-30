@@ -12,6 +12,13 @@ public class RE9ToggleADSProbe
     const int VK_ESCAPE = 0x1B;
     const int VK_SHIFT = 0x10;
     const int VK_LSHIFT = 0xA0;
+    const int CameraObserverWarningInterval = 300;
+    const int MaxInputButtonCandidates = 96;
+    const int CandidateLearnDelayMs = 650;
+    const int LearnedButtonMissThreshold = 3;
+    const int LearnedButtonDisappearUpdateGrace = 500;
+    const int LearnedButtonStaleUpdateThreshold = 2000;
+    const int InitialPatchErrorWarningCount = 3;
 
     static bool toggleEnabled = true;
     static bool gameHoldOverrideEnabled = true;
@@ -53,6 +60,7 @@ public class RE9ToggleADSProbe
     static ulong learnedHoldButtonAddress;
     static int learnedHoldLastSeenUpdate;
     static bool learnedHoldSeenThisPress;
+    static int learnedHoldMisses;
     static ulong activeCandidateAddress;
     static long activeCandidateStartedAt;
     static int activeCandidateIndex = -1;
@@ -138,6 +146,7 @@ public class RE9ToggleADSProbe
         ImGui.Text($"active candidate: 0x{activeCandidateAddress:X}");
         ImGui.Text($"learned last seen age: {inputButtonUpdateCalls - learnedHoldLastSeenUpdate}");
         ImGui.Text($"learned seen this press: {learnedHoldSeenThisPress}");
+        ImGui.Text($"learned misses: {learnedHoldMisses}");
         ImGui.Text($"button fields captured: {inputButtonFieldsCaptured}");
     }
 
@@ -167,7 +176,7 @@ public class RE9ToggleADSProbe
         }
         catch (Exception e)
         {
-            if (diagnosticLogging && (cameraHookCalls % 300) == 1)
+            if (diagnosticLogging && (cameraHookCalls % CameraObserverWarningInterval) == 1)
             {
                 API.LogWarning($"[RE9ToggleADS] camera observer failed: {e.Message}");
             }
@@ -237,7 +246,17 @@ public class RE9ToggleADSProbe
 
             if (learnedHoldButtonAddress != 0 && !learnedHoldSeenThisPress)
             {
-                ClearLearnedHoldButton("learned button disappeared");
+                learnedHoldMisses++;
+
+                if (learnedHoldMisses >= LearnedButtonMissThreshold &&
+                    inputButtonUpdateCalls - learnedHoldLastSeenUpdate > LearnedButtonDisappearUpdateGrace)
+                {
+                    ClearLearnedHoldButton("learned button disappeared");
+                }
+            }
+            else
+            {
+                learnedHoldMisses = 0;
             }
 
             if (pressInProgress && (cameraAds || sawAdsDuringPress))
@@ -347,7 +366,7 @@ public class RE9ToggleADSProbe
             inputButtonPatchErrors++;
             inputButtonPatchStatus = $"{source}: failed {e.Message}";
 
-            if (inputButtonPatchErrors <= 3 || diagnosticLogging)
+            if (inputButtonPatchErrors <= InitialPatchErrorWarningCount || diagnosticLogging)
             {
                 API.LogWarning($"[RE9ToggleADS] button patch failed source={source}: {e.Message}");
             }
@@ -381,6 +400,7 @@ public class RE9ToggleADSProbe
         if (buttonAddress == learnedHoldButtonAddress)
         {
             learnedHoldLastSeenUpdate = inputButtonUpdateCalls;
+            learnedHoldMisses = 0;
 
             if (pressInProgress || lastRButtonDown)
             {
@@ -429,7 +449,7 @@ public class RE9ToggleADSProbe
 
             if (!buttonCandidates.TryGetValue(buttonAddress, out var candidate))
             {
-                if (buttonCandidateOrder.Count >= 96)
+                if (buttonCandidateOrder.Count >= MaxInputButtonCandidates)
                 {
                     return;
                 }
@@ -516,7 +536,7 @@ public class RE9ToggleADSProbe
         }
 
         long elapsed = Environment.TickCount64 - activeCandidateStartedAt;
-        if (lastRButtonDown || elapsed < 650)
+        if (lastRButtonDown || elapsed < CandidateLearnDelayMs)
         {
             return;
         }
@@ -525,6 +545,7 @@ public class RE9ToggleADSProbe
         {
             learnedHoldButtonAddress = activeCandidateAddress;
             learnedHoldLastSeenUpdate = inputButtonUpdateCalls;
+            learnedHoldMisses = 0;
             candidateStatus = $"learned 0x{learnedHoldButtonAddress:X}";
 
             if (diagnosticLogging)
@@ -564,6 +585,7 @@ public class RE9ToggleADSProbe
 
         learnedHoldButtonAddress = 0;
         learnedHoldLastSeenUpdate = inputButtonUpdateCalls;
+        learnedHoldMisses = 0;
         activeCandidateAddress = 0;
         candidateStatus = $"{reason}; relearning";
     }
@@ -575,7 +597,7 @@ public class RE9ToggleADSProbe
             return;
         }
 
-        if (inputButtonUpdateCalls - learnedHoldLastSeenUpdate > 2000)
+        if (inputButtonUpdateCalls - learnedHoldLastSeenUpdate > LearnedButtonStaleUpdateThreshold)
         {
             ClearLearnedHoldButton("learned button stale");
         }
