@@ -1,0 +1,120 @@
+name: Release Fluffy Mod
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-fluffy-mod
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Package and release
+    runs-on: ubuntu-latest
+
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && github.repository_owner == 'comdev1337'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6
+        with:
+          fetch-depth: 2
+
+      - name: Read mod metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="$(grep -E '^version=' modinfo.ini | head -n 1 | cut -d '=' -f 2- | tr -d '\r')"
+          name="$(grep -E '^name=' modinfo.ini | head -n 1 | cut -d '=' -f 2- | tr -d '\r')"
+
+          if [[ -z "${version}" ]]; then
+            echo "modinfo.ini is missing version=..." >&2
+            exit 1
+          fi
+
+          if [[ -z "${name}" ]]; then
+            name="RE9 Toggle ADS"
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "tag=v${version}" >> "${GITHUB_OUTPUT}"
+          echo "name=${name}" >> "${GITHUB_OUTPUT}"
+          echo "zip=RE9-Toggle-ADS-v${version}-Fluffy.zip" >> "${GITHUB_OUTPUT}"
+
+      - name: Check version changed
+        id: version_changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          previous_version="$(git show HEAD^:modinfo.ini 2>/dev/null | grep -E '^version=' | head -n 1 | cut -d '=' -f 2- | tr -d '\r' || true)"
+          current_version="${{ steps.meta.outputs.version }}"
+
+          if [[ -z "${previous_version}" || "${previous_version}" != "${current_version}" ]]; then
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            echo "modinfo.ini version is still ${current_version}; skipping release."
+          fi
+
+      - name: Validate package files
+        if: steps.version_changed.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f modinfo.ini
+          test -f cover.jpg
+          test -f reframework/plugins/source/RE9ToggleADS.cs
+
+      - name: Build Fluffy Mod Manager zip
+        if: steps.version_changed.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip -9 -r "${{ steps.meta.outputs.zip }}" \
+            modinfo.ini \
+            cover.jpg \
+            reframework/plugins/source/RE9ToggleADS.cs
+
+      - name: Publish GitHub release
+        if: steps.version_changed.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          MOD_NAME: ${{ steps.meta.outputs.name }}
+          ZIP: ${{ steps.meta.outputs.zip }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          notes="Fluffy Mod Manager package for ${MOD_NAME} ${VERSION}.
+
+          Install by placing ${ZIP} in ModManager\Games\RE9\Mods."
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" \
+              --title "${MOD_NAME} ${VERSION}" \
+              --notes "${notes}" \
+              --latest
+            gh release upload "${TAG}" "${ZIP}" --clobber
+          else
+            gh release create "${TAG}" "${ZIP}" \
+              --target "${GITHUB_SHA}" \
+              --title "${MOD_NAME} ${VERSION}" \
+              --notes "${notes}" \
+              --latest
+          fi

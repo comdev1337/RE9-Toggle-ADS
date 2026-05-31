@@ -2,7 +2,7 @@
 
 REFramework.NET mod to **toggle** ADS on RMB instead of **holding RMB down all the time like a retard that Capcom thinks you are**
 
-<img width="1209" height="704" alt="image" src="https://github.com/user-attachments/assets/c1d4beb7-0548-44a1-8bed-7f53caf3d9cf" />
+<img alt="RE9 Toggle ADS cover" src="cover.jpg" />
 
 ## Features
 
@@ -13,7 +13,7 @@ REFramework.NET mod to **toggle** ADS on RMB instead of **holding RMB down all t
 ## Installation
 
 1. Install all [prerequisites](https://cursey.github.io/reframework-book/api_cs/general/index.html#prerequisites) for a REFramework build with REFramework.NET support. If installed right, you'll likely observe a cmd generating a ton of .NET assemblies when starting the game.
-2. Put [RE9ToggleADS.cs](RE9ToggleADS.cs) in `reframework\plugins\source`
+2. For [Fluffy Mod Manager](https://www.nexusmods.com/site/mods/818): download [.zip from releases](https://github.com/comdev1337/RE9-Toggle-ADS/releases), move to `ModManager\Games\RE9\Mods`. Otherwise just put [RE9ToggleADS.cs](reframework/plugins/source/RE9ToggleADS.cs) in `reframework\plugins\source`.
 
 ## Notes
 
