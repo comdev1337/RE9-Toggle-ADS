@@ -1,6 +1,6 @@
 # RE9 Toggle ADS
 
-REFramework.NET mod to **toggle** ADS on RMB instead of **holding RMB down all the time like a retard that Capcom thinks you are**
+REFramework.NET mod to **toggle** aiming instead of **holding RMB down all the time like a retard that Capcom thinks you are**
 
 <img alt="RE9 Toggle ADS cover" src="cover.jpg" />
 
